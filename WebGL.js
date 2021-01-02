@@ -460,8 +460,7 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
     mdlMatrix_cube.scale(5.0, 5.0, 5.0);
 
     mdlMatrix_cube2.translate(0.0, 15.0, 150.0);
-    mdlMatrix_cube2.scale(30.0, 30.0, 0.5);
-    mdlMatrix_cube2.rotate(90, 1, 0, 0);
+    mdlMatrix_cube2.scale(15.0, 15.0, 0.5);
 
 
     if (IsCube){
