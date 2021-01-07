@@ -5,7 +5,9 @@ var VSHADER_SOURCE = `
     uniform mat4 u_MvpMatrix;
     uniform mat4 u_modelMatrix;
     uniform mat4 u_normalMatrix;
+    uniform mat4 u_ProjMatrixFromLight;
     uniform mat4 u_MvpMatrixOfLight;
+    varying vec4 v_PositionFromLight;
     varying vec3 v_Normal;
     varying vec3 v_PositionInWorld;
     varying vec2 v_TexCoord;
@@ -14,8 +16,10 @@ var VSHADER_SOURCE = `
         v_PositionInWorld = (u_modelMatrix * a_Position).xyz; 
         v_Normal = normalize(vec3(u_normalMatrix * a_Normal));
         v_TexCoord = a_TexCoord;
+        v_PositionFromLight = u_MvpMatrixOfLight * a_Position; //for shadow
     }    
 `;
+
 
 //using lab07
 var FSHADER_SOURCE = `
@@ -27,9 +31,15 @@ var FSHADER_SOURCE = `
     uniform float u_Ks;
     uniform float u_shininess;
     uniform sampler2D u_Sampler;
+    uniform sampler2D u_ShadowMap;
     varying vec3 v_Normal;
     varying vec3 v_PositionInWorld;
     varying vec2 v_TexCoord;
+    varying vec4 v_PositionFromLight;
+
+    const float deMachThreshold = 0.005; 
+    //0.001 if having high precision depth
+    
     void main(){
         // let ambient and diffuse color are u_Color 
         // (you can also input them from ouside and make them different)
@@ -58,9 +68,33 @@ var FSHADER_SOURCE = `
             specular = u_Ks * pow(specAngle, u_shininess) * specularLightColor; 
         }
 
-        gl_FragColor = vec4( ambient + diffuse + specular, 1.0 );
+        //***** shadow
+        vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
+        vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);
+        /////////******** LOW precision depth implementation ********///////////
+        float depth = rgbaDepth.r;
+        float visibility = (shadowCoord.z > depth + deMachThreshold) ? 0.3 : 1.0;
+
+        gl_FragColor = vec4( (ambient + diffuse + specular)*visibility, 1.0);
     }
 `;
+
+
+var VSHADER_SHADOW_SOURCE = `
+      attribute vec4 a_Position;
+      uniform mat4 u_MvpMatrix;
+      void main(){
+          gl_Position = u_MvpMatrix * a_Position;
+      }
+  `;
+
+var FSHADER_SHADOW_SOURCE = `
+      precision mediump float;
+      void main(){
+        /////////** LOW precision depth implementation **/////
+        gl_FragColor = vec4(gl_FragCoord.z, 0.0, 0.0, 1.0);
+      }
+  `;
 
 
 var VSHADER_SOURCE_ENVCUBE = `
@@ -254,6 +288,10 @@ var numTextures = imgNames.length;
 var offScreenWidth = 2048, offScreenHeight = 2048;
 var fbo;
 
+var lightX = 8;
+var lightY = 32;
+var lightZ = 200;
+
 function SetProgram(program){
     gl.useProgram(program);
 
@@ -281,6 +319,13 @@ async function main(){
         console.log('Failed to get the rendering context for WebGL');
         return ;
     }
+
+
+    //setup shaders and prepare shader variables
+    shadowProgram = compileShader(gl, VSHADER_SHADOW_SOURCE, FSHADER_SHADOW_SOURCE);
+    shadowProgram.a_Position = gl.getAttribLocation(shadowProgram, 'a_Position');
+    shadowProgram.u_MvpMatrix = gl.getUniformLocation(shadowProgram, 'u_MvpMatrix');
+
 
     var quad = new Float32Array(
         [
@@ -406,15 +451,20 @@ async function main(){
     document.onkeydown = function(ev){keydown(ev)};
 }
 
+let lampMdlFromLight= new Matrix4();
+let catMdlFromLight= new Matrix4();
+let groundMdlFromLight= new Matrix4();
 
 function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
     let rotateMatrix = new Matrix4();
 
-    if (IsOffScreen == 0){
+    if (IsOffScreen == 0)
+    {
         rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
         rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     }
-    else{
+    else
+    {
         rotateMatrix.setIdentity();
         //rotateMatrix.setRotate(90, 0, 0, 0);//for mouse rotation
         var angle_time = 0;
@@ -462,29 +512,38 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
     mdlMatrix_cube.scale(5.0, 5.0, 5.0);
 
 
-    drawOneObject(lamp, mdlMatrix_lamp, 0, newViewDir, cameraX, cameraY, cameraZ);
-    drawOneObject(ground, mdlMatrix_wood, 1, newViewDir, cameraX, cameraY, cameraZ);
-    drawOneObject(cat, mdlMatrix_cat, 2, newViewDir, cameraX, cameraY, cameraZ);
-    drawOneObject(cube, mdlMatrix_cube, 3, newViewDir, cameraX, cameraY, cameraZ);
+    if (IsOffScreen == 1){
+        lampMvpFromLight = drawOffScreen(lamp, mdlMatrix_lamp);
+        catMvpFromLight = drawOffScreen(cat, mdlMatrix_cat);
+        groundMvpFromLight = drawOffScreen(ground, mdlMatrix_wood);
+    }else{
+        drawOneObject(lamp, mdlMatrix_lamp, 0, newViewDir, cameraX, cameraY, cameraZ, 1, lampMvpFromLight);
+        drawOneObject(ground, mdlMatrix_wood, 1, newViewDir, cameraX, cameraY, cameraZ, 1, groundMvpFromLight);
+        drawOneObject(cat, mdlMatrix_cat, 2, newViewDir, cameraX, cameraY, cameraZ, 1, catMvpFromLight);
+
+    }
+    //drawOneObject(cube, mdlMatrix_cube, 3, newViewDir, cameraX, cameraY, cameraZ);
 
 
 
+    if (IsOffScreen == 0){
 
-    //quad
-    gl.useProgram(programEnvCube);
+        //quad
+        gl.useProgram(programEnvCube);
 
-    gl.depthFunc(gl.LEQUAL);
-    gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
-        false, vpFromCameraInverse.elements);
+        gl.depthFunc(gl.LEQUAL);
+        gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
+            false, vpFromCameraInverse.elements);
 
-    gl.activeTexture(gl.TEXTURE0);
+        gl.activeTexture(gl.TEXTURE0);
 
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
 
-    gl.uniform1i(programEnvCube.u_envCubeMap, 0);
-    initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
-    gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
+        gl.uniform1i(programEnvCube.u_envCubeMap, 0);
+        initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
+        gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
+    }
 }
 
 
@@ -492,10 +551,8 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
 ////   (setup the model matrix and color to draw)
 function draw(){
 
-    fbo = initFrameBuffer(gl);
-    gl.useProgram(program);
+    gl.useProgram(shadowProgram);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-
     gl.viewport(0, 0, offScreenWidth, offScreenHeight);
     gl.clearColor(0.0, 0.0, 0.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -514,11 +571,34 @@ function draw(){
     draw_rep(cameraX, cameraY, cameraZ, 1, 0);
 }
 
+function drawOffScreen(obj, mdlMatrix){
+    var mvpFromLight = new Matrix4();
+    //model Matrix (part of the mvp matrix)
+    let modelMatrix = new Matrix4();
+    modelMatrix.setRotate(angleY, 1, 0, 0);
+    modelMatrix.rotate(angleX, 0, 1, 0);
+    modelMatrix.multiply(mdlMatrix);
+    //mvp: projection * view * model matrix  
+    mvpFromLight.setPerspective(30, offScreenWidth/offScreenHeight, 1, 200);
+    mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, 0, 0, 1, 0);
+    mvpFromLight.multiply(modelMatrix);
+
+    gl.uniformMatrix4fv(shadowProgram.u_MvpMatrix, false, mvpFromLight.elements);
+
+    for( let i=0; i < obj.length; i ++ ){
+        initAttributeVariable(gl, shadowProgram.a_Position, obj[i].vertexBuffer);
+        gl.drawArrays(gl.TRIANGLES, 0, obj[i].numVertices);
+    }
+
+    return mvpFromLight;
+}
+
+
 //obj: the object components
 //mdlMatrix: the model matrix without mouse rotation
 //colorR, G, B: object color
 //function drawOneObject(obj, mdlMatrix, colorR, colorG, colorB, index){
-function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, cameraZ){
+function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, cameraZ, ok, mvpFromLight){
 
     mvpMatrix = new Matrix4();
     normalMatrix = new Matrix4();
@@ -529,19 +609,30 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
     mvpMatrix.setPerspective(30, 1, 1, 200);
 
     //model Matrix (part of the mvp matrix)
-    //
-    //modelMatrix.setTranslate(1.0, 1.0, 1.0);
     modelMatrix = new Matrix4();
     modelMatrix.setRotate(angleX, 0.0, 1.0, 0.0);//for mouse rotation
-    //mvp: projection * view * model matrix  
     modelMatrix.setScale(1.0, 1.0, 1.0);
-    //mvpMatrix.setPerspective(30, 1, 1, 100);
     modelMatrix.multiply(mdlMatrix);
+    //modelMatrix.setTranslate(1.0, 1.0, 1.0);
+    //mvp: projection * view * model matrix  
+    //mvpMatrix.setPerspective(30, 1, 1, 100);
     //mvpMatrix.setPerspective(30, 1, 1, 100);
     //mvpMatrix.setPerspective(60, 1, 1, 100);
     //mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
     //mvpMatrix.lookAt(cameraX, cameraY, cameraZ, cameraX+5, cameraY, cameraZ+5, 0, 1, 0);
     //
+    //
+    var mvpFromCamera = new Matrix4();
+    mvpFromCamera.setPerspective(30, 1, 1, 200);
+    mvpFromCamera.lookAt(cameraX, cameraY, cameraZ, 
+        cameraX + newViewDir.elements[0], 
+        cameraY + newViewDir.elements[1], 
+        cameraZ + newViewDir.elements[2], 
+        0, 1, 0);
+
+    mvpFromCamera.multiply(modelMatrix);
+
+
     mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 
         cameraX + newViewDir.elements[0], 
         cameraY + newViewDir.elements[1], 
@@ -560,12 +651,15 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
     gl.uniform1f(program.u_Kd, 0.7);
     gl.uniform1f(program.u_Ks, 1.0);
     gl.uniform1f(program.u_shininess, 10.0);
+    gl.uniform1i(program.u_ShadowMap, 0);
     //gl.uniform3f(program.u_Color, colorR, colorG, colorB);
 
 
     gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
     gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
     gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+    if (ok == 1)
+        gl.uniformMatrix4fv(program.u_MvpMatrixOfLight, false, mvpFromLight.elements);
 
     gl.activeTexture(gl.TEXTURE0);
 
@@ -573,10 +667,8 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
         gl.bindTexture(gl.TEXTURE_2D, fbo.texture); 
     else
         gl.bindTexture(gl.TEXTURE_2D, textures[objCompImgIndex[index]]);
+
     for( let i=0; i < obj.length; i ++ ){
-
-
-
         gl.uniform1i(program.u_Sampler0, 0);
 
         initAttributeVariable(gl, program.a_Position, obj[i].vertexBuffer);
