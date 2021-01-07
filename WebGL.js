@@ -270,7 +270,6 @@ var cubeMapTex;
 var transformMat = new Matrix4();
 var matStack =[];
 var u_modelMatrix;
-var far = 20;
 
 function pushMatrix(){
     matStack.push(new Matrix4(transformMat));
@@ -479,7 +478,7 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
 
 
     var vpFromCamera = new Matrix4();
-    vpFromCamera.setPerspective(30, 1, 1, far);          
+    vpFromCamera.setPerspective(30, 1, 1, 200);          
     var viewMatrixRotationOnly = new Matrix4();
 
     viewMatrixRotationOnly.lookAt(cameraX, cameraY, cameraZ, 
@@ -502,17 +501,16 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
     let mdlMatrix_cube = new Matrix4(); 
     let mdlMatrix_cube2 = new Matrix4(); 
 
-    mdlMatrix_lamp.translate(0.0, 0.0, 0.0);
+    mdlMatrix_lamp.translate(16.0, 3.0, 100.0);
     mdlMatrix_lamp.rotate(90, 0, 1, 0);
+    mdlMatrix_wood.translate(6.0, -9.0, 100.0);
 
-    mdlMatrix_wood.translate(0.0, 0.0, 0.0);
-
-    mdlMatrix_cat.translate(0.0, 0.0, 0.0);
-    mdlMatrix_cat.scale(2.0, 2.0, 2.0);
+    mdlMatrix_cat.translate(6.0, -9.0, 100.0);
+    mdlMatrix_cat.scale(1.0, 1.0, 1.0);
     mdlMatrix_cat.rotate(90, 0, 1, 0);
 
-    mdlMatrix_cube.translate(0.0, 0.0, 0.0);
-    mdlMatrix_cube.scale(1.0, 1.0, 1.0);
+    mdlMatrix_cube.translate(9.0, 12.0, 100.0);
+    mdlMatrix_cube.scale(5.0, 5.0, 5.0);
 
 
     if (IsOffScreen == 1){
@@ -523,8 +521,9 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
         drawOneObject(lamp, mdlMatrix_lamp, 0, newViewDir, cameraX, cameraY, cameraZ, 1, lampMvpFromLight);
         drawOneObject(ground, mdlMatrix_wood, 1, newViewDir, cameraX, cameraY, cameraZ, 1, groundMvpFromLight);
         drawOneObject(cat, mdlMatrix_cat, 2, newViewDir, cameraX, cameraY, cameraZ, 1, catMvpFromLight);
-        drawOneObject(cube, mdlMatrix_cube, -1, newViewDir, cameraX, cameraY, cameraZ);
+        drawOneObject(cube, mdlMatrix_cube, -1, newViewDir, cameraX, cameraY, cameraZ, 1, cubeMdlFromLight);
     }
+    //drawOneObject(cube, mdlMatrix_cube, 3, newViewDir, cameraX, cameraY, cameraZ);
 
 
 
@@ -582,7 +581,7 @@ function drawOffScreen(obj, mdlMatrix){
     modelMatrix.rotate(angleX, 0, 1, 0);
     modelMatrix.multiply(mdlMatrix);
     //mvp: projection * view * model matrix  
-    mvpFromLight.setPerspective(30, offScreenWidth/offScreenHeight, 1, far);
+    mvpFromLight.setPerspective(30, offScreenWidth/offScreenHeight, 1, 200);
     mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, 0, 0, 1, 0);
     mvpFromLight.multiply(modelMatrix);
 
@@ -609,7 +608,7 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
     gl.useProgram(program);
     gl.enable(gl.DEPTH_TEST);
 
-    mvpMatrix.setPerspective(30, 1, 1, far);
+    mvpMatrix.setPerspective(30, 1, 1, 200);
 
     //model Matrix (part of the mvp matrix)
     modelMatrix = new Matrix4();
@@ -626,7 +625,7 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
     //
     //
     var mvpFromCamera = new Matrix4();
-    mvpFromCamera.setPerspective(30, 1, 1, far);
+    mvpFromCamera.setPerspective(30, 1, 1, 200);
     mvpFromCamera.lookAt(cameraX, cameraY, cameraZ, 
         cameraX + newViewDir.elements[0], 
         cameraY + newViewDir.elements[1], 
@@ -648,7 +647,7 @@ function drawOneObject(obj, mdlMatrix, index, newViewDir, cameraX, cameraY, came
     normalMatrix.setInverseOf(modelMatrix);
     normalMatrix.transpose();
 
-    gl.uniform3f(program.u_LightPosition, 3, 5, 0);
+    gl.uniform3f(program.u_LightPosition, 8, 32, 200);
     gl.uniform3f(program.u_ViewPosition, 3, 3, 3);
     gl.uniform1f(program.u_Ka, 0.8);
     gl.uniform1f(program.u_Kd, 0.7);
