@@ -416,16 +416,16 @@ async function main(){
     imagecat.src = "cat.jpg";
 
     
-    //response = await fetch('cube.obj');
-    //text = await response.text();
-    //obj = parseOBJ(text);
-    //for( let i=0; i < obj.geometries.length; i ++ ){
-    //    let o = initVertexBufferForLaterUse(gl, 
-    //      obj.geometries[i].data.position,
-    //      obj.geometries[i].data.normal, 
-    //      obj.geometries[i].data.texcoord);
-    //    cube.push(o);
-    //}
+    response = await fetch('cube.obj');
+    text = await response.text();
+    obj = parseOBJ(text);
+    for( let i=0; i < obj.geometries.length; i ++ ){
+        let o = initVertexBufferForLaterUse(gl, 
+          obj.geometries[i].data.position,
+          obj.geometries[i].data.normal, 
+          obj.geometries[i].data.texcoord);
+        cube.push(o);
+    }
 
     //var imagecube= new Image();
     //imagecube.onload = function(){initTexture(gl, imagecube, "cubeTex");};
@@ -452,6 +452,7 @@ async function main(){
 }
 
 let lampMdlFromLight= new Matrix4();
+let cubeMdlFromLight= new Matrix4();
 let catMdlFromLight= new Matrix4();
 let groundMdlFromLight= new Matrix4();
 
@@ -520,7 +521,7 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
         drawOneObject(lamp, mdlMatrix_lamp, 0, newViewDir, cameraX, cameraY, cameraZ, 1, lampMvpFromLight);
         drawOneObject(ground, mdlMatrix_wood, 1, newViewDir, cameraX, cameraY, cameraZ, 1, groundMvpFromLight);
         drawOneObject(cat, mdlMatrix_cat, 2, newViewDir, cameraX, cameraY, cameraZ, 1, catMvpFromLight);
-
+        drawOneObject(cube, mdlMatrix_cube, -1, newViewDir, cameraX, cameraY, cameraZ, 1, cubeMdlFromLight);
     }
     //drawOneObject(cube, mdlMatrix_cube, 3, newViewDir, cameraX, cameraY, cameraZ);
 
@@ -551,6 +552,7 @@ function draw_rep(cameraX, cameraY, cameraZ, IsCube, IsOffScreen){
 ////   (setup the model matrix and color to draw)
 function draw(){
 
+    fbo = initFrameBuffer(gl);
     gl.useProgram(shadowProgram);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, offScreenWidth, offScreenHeight);
