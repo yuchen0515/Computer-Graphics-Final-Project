@@ -6,7 +6,8 @@
 
 ## Demo
 
-![](https://imgur.com/ALiImGm.gif)
+![](https://i.imgur.com/YFZuNfZ.gif)
+
 
 * 3D物件、貼材質
 * local illmination、點光源
