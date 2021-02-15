@@ -6,7 +6,7 @@
 
 ## Demo
 
-![](https://i.imgur.com/YFZuNfZ.gif)
+![](https://github.com/yuchen0515/Computer-Graphics-Final-Project/blob/dynamic-reflection/cg0215%20(5).gif?raw=true)
 
 
 * 3D物件、貼材質
