@@ -20,12 +20,12 @@
 
 ## Project Requirement
 
-### Required User Interaction: (30%)
+### Required User Interaction (30%)
 - [x] One of the 3D objects is the ”player”. Users can **move** the player and **rotate** the player by themouse and keyboard.
 - [x] By default, your camera should move/rotate along with the ”player”.  This is so called the first person view angle.
 - [x] Allow users to switch between the **first person view angle** and the **third** person view angle (by pressing the mouse button or a key). The third person view angle can be just a fixed camera position which can cover most of the region of your scene.
 
-### Technical Requirements: (35%)
+### Technical Requirements (35%)
 - [x] 1  **point  light**  and  implement  the  **local  illumination**  (ambient+difusse+specular  and  phongshading)
 - [x] At least, 1 of the **3D** objects with **nice texture mapping**
 - [x] Use an environment **cube map** to have the environment background
